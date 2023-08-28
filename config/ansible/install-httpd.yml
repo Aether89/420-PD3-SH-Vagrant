@@ -1,0 +1,47 @@
+---
+- name: Install and configure HTTPd server
+  hosts: 192.168.33.10
+  become: yes
+
+  tasks:
+    - name: Install Apache2
+      apt:
+        name: apache2
+        state: present
+      when: ansible_os_family == 'Debian'
+
+    - name: Install MariaDB Client
+      apt:
+        name: mariadb-client
+        state: present
+      when: ansible_os_family == 'Debian'
+
+    - name: Install PHP8.2
+      apt:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - php8.2
+        - php8.2-cli
+        - php8.2-mysql
+      when: ansible_os_family == 'Debian'
+
+    - name: Copy the file to /var/www/html
+      ansible.builtin.copy:
+        src: /home/vagrant/config/index.php
+        dest: /var/www/html/index.php
+      register: copy_result
+
+    - name: Change the owner and group of the file
+      ansible.builtin.file:
+        path: /var/www/html/index.php
+        owner: www-data
+        group: www-data
+        state: file
+      when: copy_result.changed
+
+    - name: Set MariaDB root password
+      command: |
+        mysql -u root -e "ALTER USER 'root'@'localhost' IDENTIFIED BY 'ChuckIsGreat543';"
+      ignore_errors: yes
+      become: yes
