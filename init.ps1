@@ -43,11 +43,7 @@ function replaceInFile {
         [string]$toReplace,
         [string]$replacement
     )
-
-    $fileInput
-    $toReplace
-    $replacement
-
+    
     $replaceInFileContent = Get-Content -Path $fileInput -Raw
     $replaceInFileContent = $replaceInFileContent -replace $toReplace, $replacement
     $replaceInFileContent | Set-Content -Path $fileInput
@@ -141,11 +137,13 @@ for ($i = 0; $i -lt $vmNumber; $i++) {
     # mets an mémoire les deux première ip pour 
     # l'ajout dans le fichier hosts
     switch ($i) {
-        0 { $httpdIP = $newIP
+        0 {
+            $httpdIP = $newIP
             replaceInFile -fileInput $clientPlaybookPath$setupPB -toReplace $stringToReplace -replacement $newIP 
             replaceInFile -fileInput $clientPlaybookPath$httdPB -toReplace $stringToReplace -replacement $newIP 
         }
-        1 { $apiIP = $newIP 
+        1 {
+            $apiIP = $newIP 
             replaceInFile -fileInput $clientPlaybookPath$setupPB -toReplace $stringToReplace -replacement $newIP 
             replaceInFile -fileInput $clientPlaybookPath$apiPB -toReplace $stringToReplace -replacement $newIP 
         }
