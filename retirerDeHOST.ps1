@@ -1,3 +1,11 @@
+<####################################
+#   autheur: Aether89
+#   descriiption: Script pour supprimer
+#   des Clients/IP du fichier HOST
+#   d'Ansible
+###################################>
+
+
 if ($IsWindows) {
     $installPathOS = "C:/"
 }
@@ -9,16 +17,20 @@ else {
 $commonPath = $installPathOS + 'travail/commun/'
 $configPath = $commonPath + 'config/'
 $vagrantHosts = $configPath + ".hosts/"
-$hostFile = "/HOST"
+$hostFile = "HOST"
 
 #variable de chemin des fichiers
 $hostPath = $configPath + $hostFile
-
-Write-Output "`nClients dans hosts`n"
-$validName = Get-ChildItem -Path $vagrantHosts -Name
 $exitOption = "-q"
 
 do {
+do {
+    $validName = Get-ChildItem -Path $vagrantHosts -Name
+
+    if ($validName.Count -le 0) {
+        Write-Output "Dossier .hosts vide, Opération annulé"
+        exit
+    }
     Write-Output "Noms de clients valides:`n$validName"
     $client = Read-Host -Prompt "Insérer le nom du client que vous voulez retirer du fichier HOST de Ansible ('$exitOption' pour quitter)"
 
@@ -32,6 +44,7 @@ do {
 $vagrantHostsFile = $vagrantHosts + $client
 
 $contentToRemove = Get-Content -Path $vagrantHostsFile
+$hostPath
 $contentToClean = Get-Content -Path $hostPath
 
 $newContent = @()
@@ -44,4 +57,5 @@ foreach ($line in $contentToClean) {
 $newContent | Set-Content -Path $hostPath
 Remove-Item $vagrantHostsFile
 Write-Output "Fichier HOST Nettoyer"
-Read-Host -Prompt 'Appuyer sur Entrée pour quitter'
+
+} Until ($client -eq $exitOption)

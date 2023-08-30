@@ -6,8 +6,9 @@ ssh-copy-id vagrant@{{IP2}}
 ssh-copy-id vagrant@{{IP3}}
 
 
-ansible-playbook -i /home/vagrant/config/ansible/hosts /home/vagrant/config/ansible/update.yml
-ansible-playbook -i /home/vagrant/config/ansible/hosts /home/vagrant/config/ansible/install-mariadb.yml
-ansible-playbook -i /home/vagrant/config/ansible/hosts /home/vagrant/config/ansible/configure-mariadb.yml
-ansible-playbook -i /home/vagrant/config/ansible/hosts /home/vagrant/config/ansible/add-user.yml
-ansible-playbook -i /home/vagrant/config/ansible/hosts /home/vagrant/config/ansible/install-httpd.yml
+ansible-playbook -i /home/vagrant/config/hosts /home/vagrant/config/{{CLIENT}}/playbook/update.yml
+ansible-playbook -i /home/vagrant/config/hosts /home/vagrant/config/{{CLIENT}}/playbook/httpd-install.yml
+ansible-playbook -i /home/vagrant/config/hosts /home/vagrant/config/{{CLIENT}}/playbook/api-install.yml
+ansible-playbook -i /home/vagrant/config/hosts /home/vagrant/config/{{CLIENT}}/playbook/db-install.yml
+ansible-playbook -i /home/vagrant/config/hosts /home/vagrant/config/{{CLIENT}}/playbook/db-configure.yml
+ansible-playbook -i /home/vagrant/config/ansible/hosts /home/vagrant/config/{{CLIENT}}/playbook/db-add-user.yml

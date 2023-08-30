@@ -1,8 +1,11 @@
-<#
-Script pour automatiser le processus de création de VagrantFile et pour Ansible
-#>
+<####################################
+#   autheur: Aether89
+#   descriiption: Script pour automatiser 
+#   le processus de création de VagrantFile 
+#   et playbook pour Ansible
+###################################>
 
-# Vérifie si le dossier existe, sinon le crée
+# Fonction pour Vérifier si le dossier existe, sinon le crée
 function createIfNotExist {
     param (
         [string]$path
@@ -34,6 +37,23 @@ function ipUpdate {
     $tmpIP
 }
 
+function replaceInFile {
+    param (
+        [string]$fileInput,
+        [string]$toReplace,
+        [string]$replacement
+    )
+
+    $fileInput
+    $toReplace
+    $replacement
+
+    $replaceInFileContent = Get-Content -Path $fileInput -Raw
+    $replaceInFileContent = $replaceInFileContent -replace $toReplace, $replacement
+    $replaceInFileContent | Set-Content -Path $fileInput
+}
+
+
 # Dossier Racine pour la localisation des scripts et fichiers
 if ($IsWindows) {
     $installPathOS = "C:/"
@@ -61,6 +81,13 @@ $hostFile = "/HOST"
 $VagrantFile = "/VagrantFile"
 $addtohostfile = "addtohost.ps1"
 $winHostFile = "winhost.ps1"
+$apiPB = "api-install.yml"
+$dbAddUserPB = "db-add-user.yml"
+$dbConfigurePB = "db-configure.yml"
+$dbInstallPB = "db-install.yml"
+$httdPB = "httpd-install.yml"
+$setupPB = "setup.sh"
+$updatePB = "update.yml"
 
 #variable de chemin  utiliser dans le script
 $commonPath = $installPathOS + 'travail/commun/'
@@ -73,6 +100,7 @@ $vagrantHosts = $configPath + ".hosts/"
 $ipPath = $commonPath + "next.txt"
 $templateClientPath = $templatePath + "client"
 $playbookPath = $templatePath + "playbook"
+$clientPlaybookPath = $installPath + "playbook/"
 $hostPath = $configPath + $hostFile
 $vagrantPath = $installPath + $VagrantFile
 ### $clienthostPath = $installPath + $hostFile
@@ -81,11 +109,15 @@ $vagrantHostsFile = $VagrantHosts + $client
 
 #utiliser pour le fichier HOST de Ansible
 $bracketClient = "[$client]"
-$templateClientPath
 Copy-Item -Path "$templateClientPath\*" -Destination $installPath -Recurse -Force
 
 #copie les playbook de templates dans le dossieer du client
 Copy-Item -r $playbookPath $installPath
+
+# remplace {{CLIENT} dans les fichiers playbook avec le nom du client
+replaceInFile -fileInput $clientPlaybookPath$setupPB -toReplace "{{CLIENT}}" -replacement $client 
+replaceInFile -fileInput $clientPlaybookPath$updatePB -toReplace "{{CLIENT}}" -replacement $client 
+
 
 # Obtien la derniere address IP de next.txt puis incrémente 
 # les address et les mets à jours dans le VagrantFile
@@ -109,9 +141,20 @@ for ($i = 0; $i -lt $vmNumber; $i++) {
     # mets an mémoire les deux première ip pour 
     # l'ajout dans le fichier hosts
     switch ($i) {
-        1 { $httpdIP = $newIP }
-        2 { $apiIP = $newIP }
-        3 { $dbIP = $newIP }
+        0 { $httpdIP = $newIP
+            replaceInFile -fileInput $clientPlaybookPath$setupPB -toReplace $stringToReplace -replacement $newIP 
+            replaceInFile -fileInput $clientPlaybookPath$httdPB -toReplace $stringToReplace -replacement $newIP 
+        }
+        1 { $apiIP = $newIP 
+            replaceInFile -fileInput $clientPlaybookPath$setupPB -toReplace $stringToReplace -replacement $newIP 
+            replaceInFile -fileInput $clientPlaybookPath$apiPB -toReplace $stringToReplace -replacement $newIP 
+        }
+        2 {
+            replaceInFile -fileInput $clientPlaybookPath$setupPB -toReplace $stringToReplace -replacement $newIP 
+            replaceInFile -fileInput $clientPlaybookPath$dbinstallPB -toReplace $stringToReplace -replacement $newIP 
+            replaceInFile -fileInput $clientPlaybookPath$dbConfigurePB -toReplace $stringToReplace -replacement $newIP 
+            replaceInFile -fileInput $clientPlaybookPath$dbAddUserPB -toReplace $stringToReplace -replacement $newIP 
+        }
     }
 }
 #sauvegarde le VagrantFile dans le dossier du client
@@ -119,6 +162,9 @@ $fileContent | Set-Content -Path $vagrantPath
 
 # Mets à jours le contenue de next.txt 
 Set-Content -Path $ipPath -Value (ipUpdate -ip $IPv4 -increment ($vmNumber))
+
+# Mets a jours api-install.yml
+$fileContent = Get-Content -Path $templatePath$addtohostfile -Raw
 
 
 # Génere le contenue qui sera ajouter au hôte
