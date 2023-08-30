@@ -1,0 +1,29 @@
+---
+- name: Install MariaDB with predefined root password
+  hosts: {{IP3}}
+  become: yes
+
+  tasks:
+    - name: Install MariaDB Server
+      apt:
+        name: mariadb-server
+        state: present
+      when: ansible_os_family == 'Debian'
+
+    - name: Install MariaDB Client
+      apt:
+        name: mariadb-client
+        state: present
+      when: ansible_os_family == 'Debian'
+
+    - name: Install PyMySQL
+      apt:
+        name: python3-pymysql
+        state: present
+      when: ansible_os_family == 'Debian'
+
+    - name: Set MariaDB root password
+      command: |
+        mysql -u root -e "ALTER USER 'root'@'localhost' IDENTIFIED BY 'ChuckIsGreat543';"
+      ignore_errors: yes
+      become: yes

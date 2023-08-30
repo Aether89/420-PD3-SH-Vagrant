@@ -1,0 +1,11 @@
+---
+- name: Install and configure HTTPd server
+  hosts: {{IP1}}
+  become: yes
+
+  tasks:
+    - name: Install Apache2
+      apt:
+        name: apache2
+        state: present
+      when: ansible_os_family == 'Debian'

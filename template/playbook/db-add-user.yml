@@ -1,0 +1,22 @@
+---
+- name: Create Newtech user and database
+  hosts: {{IP3}}
+  become: yes
+
+  tasks:
+    - name: Create NewTech database
+      mysql_db:
+        name: NewTech
+        state: present
+        login_user: root
+        login_password: ChuckIsGreat543
+    
+    - name: Create NewTechUsr user
+      mysql_user:
+        name: NewTechUsr
+        host: '%'
+        password: lopl8788
+        priv: "NewTech.*:ALL"
+        state: present
+        login_user: root
+        login_password: ChuckIsGreat543

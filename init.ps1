@@ -66,30 +66,32 @@ $winHostFile = "winhost.ps1"
 $commonPath = $installPathOS + 'travail/commun/'
 $configPath = $commonPath + 'config/'
 $templatePath = $commonPath + "template/"
-$vagrantHosts = $configPath + "hosts/"
+$vagrantHosts = $configPath + ".hosts/"
 
 
 #variable de chemin des fichiers
 $ipPath = $commonPath + "next.txt"
-$templateVagrantPath = $templatePath + $VagrantFile
+$templateClientPath = $templatePath + "client"
 $playbookPath = $templatePath + "playbook"
 $hostPath = $configPath + $hostFile
 $vagrantPath = $installPath + $VagrantFile
-# $clienthostPath = $installPath + $hostFile
+### $clienthostPath = $installPath + $hostFile
 $addtohostPath = $installPath + $addtohostfile
 $vagrantHostsFile = $VagrantHosts + $client
 
 #utiliser pour le fichier HOST de Ansible
 $bracketClient = "[$client]"
+$templateClientPath
+Copy-Item -Path "$templateClientPath\*" -Destination $installPath -Recurse -Force
 
 #copie les playbook de templates dans le dossieer du client
-Copy-Item $playbookPath $installPath
+Copy-Item -r $playbookPath $installPath
 
 # Obtien la derniere address IP de next.txt puis incrémente 
 # les address et les mets à jours dans le VagrantFile
 # qui est mis dans le dossier client.
 $IPv4 = Get-Content $ipPath
-$fileContent = Get-Content -Path $templateVagrantPath -Raw
+$fileContent = Get-Content -Path $vagrantPath -Raw
 
 Add-Content -Path $hostPath -Value $bracketClient
 createIfNotExist -path $vagrantHosts
@@ -109,6 +111,7 @@ for ($i = 0; $i -lt $vmNumber; $i++) {
     switch ($i) {
         1 { $httpdIP = $newIP }
         2 { $apiIP = $newIP }
+        3 { $dbIP = $newIP }
     }
 }
 #sauvegarde le VagrantFile dans le dossier du client

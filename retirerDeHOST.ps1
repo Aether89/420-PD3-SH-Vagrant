@@ -8,7 +8,7 @@ else {
 #variable de chemin  utiliser dans le script
 $commonPath = $installPathOS + 'travail/commun/'
 $configPath = $commonPath + 'config/'
-$vagrantHosts = $configPath + "hosts/"
+$vagrantHosts = $configPath + ".hosts/"
 $hostFile = "/HOST"
 
 #variable de chemin des fichiers
@@ -16,17 +16,10 @@ $hostPath = $configPath + $hostFile
 
 Write-Output "`nClients dans hosts`n"
 $validName = Get-ChildItem -Path $vagrantHosts -Name
-
-if {$validName.Count -eq 0} {
-    Write-Output "Aucun fichier de références n'exister dans Opération annulé"
-
-}
-$validName = $validNames -join ', '
-
 $exitOption = "-q"
 
 do {
-    Write-Output "Noms de clients valides: $validName"
+    Write-Output "Noms de clients valides:`n$validName"
     $client = Read-Host -Prompt "Insérer le nom du client que vous voulez retirer du fichier HOST de Ansible ('$exitOption' pour quitter)"
 
     if ($client -eq $exitOption) {
@@ -34,7 +27,7 @@ do {
         exit
     }
     
-} until ($validNames -contains $client)
+} until ($validName -contains $client)
 
 $vagrantHostsFile = $vagrantHosts + $client
 

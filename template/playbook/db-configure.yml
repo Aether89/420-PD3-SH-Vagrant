@@ -1,0 +1,19 @@
+---
+- name: Configure MariaDB for Remote Connections
+  hosts: {{IP3}}
+  become: yes
+
+  tasks:
+    - name: Update MariaDB server configuration
+      lineinfile:
+        path: /etc/mysql/mariadb.conf.d/50-server.cnf
+        regexp: '^bind-address\s*='
+        line: 'bind-address = 0.0.0.0'
+      notify:
+        - restart mariadb
+
+  handlers:
+    - name: restart mariadb
+      service:
+        name: mysql
+        state: restarted

@@ -1,0 +1,27 @@
+#!/usr/bin/expect
+
+set timeout 120
+set remote_username [lindex $argv 0]
+set remote_host [lindex $argv 1]
+set password [lindex $argv 2]
+log_file ~/config/ssh-copy-id.log
+
+spawn ssh-copy-id $remote_username@$remote_host
+
+expect {
+    "[fingerprint])?" {
+        send "yes\r"
+        exp_continue
+    }
+    "password:" {
+        send "$password\r"
+        exp_continue
+    }
+    timeout {
+        send_user "Timeout occurred. SSH key may not have been copied.\n"
+        exit 1
+    }
+    eof {
+        send_user "SSH key copy completed.\n"
+    }
+}
