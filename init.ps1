@@ -1,3 +1,8 @@
+<#
+Script pour automatiser le processus de création de VagrantFile et pour Ansible
+#>
+
+# Vérifie si le dossier existe, sinon le crée
 function createIfNotExist {
     param (
         [string]$path
@@ -7,6 +12,7 @@ function createIfNotExist {
     }
 }
 
+# Incrément l'IP
 function ipUpdate {
     param (
         [string]$ip,
@@ -29,68 +35,116 @@ function ipUpdate {
     $tmpIP
 }
 
-$vmNumber = 3;
+# Dossier Racine pour la localisation des scripts et fichiers
 if ($IsWindows) {
     $installPathOS = "C:/"
-    $syshostsPath = "C:/Windows/System32/drivers/etc/hosts"
 }
 else {
     $installPathOS = "~/"
     $syshostsPath = "/etc/hosts"
 }
 
-$Client = Read-Host -Prompt 'Insérer le nom du client'
-$paths = @('travail/', 'commun/', 'config/', $Client)
+#nombre de VM dans le VagrantFile
+$vmNumber = 3;
 
+$Client = Read-Host -Prompt 'Insérer le nom du client'
+
+# génére  $installPath et si les dossier n'existee pas les crée
+$paths = @('travail/', 'commun/', 'config/', $Client)
 $installPath = $installPathOS
 foreach ($path in $paths) {
     $installPath = $installPath + $path
     createIfNotExist -path $installPath
 }
 
+#Chemins utiliser dans le script
+$hostFile = "/HOST"
+$addtohostfile = "addtohost.ps1"
+$winHostFile = "winhost.ps1"
+
 $commonPath = $installPathOS + 'travail/commun/'
 $configPath = $commonPath + 'config/'
+$ipPath = $commonPath + "next.txt"
 $clientPath = $configPath + $Client + '/'
-$clientConfigPath = $clientPath + "config"
 $vagrantPath = $installPath + "/VagrantFile"
 $templatePath = $commonPath + "template/"
-$ipPath = $commonPath + "next.txt"
+$templateVagrantPath = $templatePath + "VagrantFile"
+$playbookPath = $templatePath + "playbook"
+$hostPath = $configPath + $hostFile
+$clienthostPath = $clientPath + $hostFile
+$addtohostPath = $clientPath + $addtohostfile
 
+$bracketClient = "[$Client]"
+
+#copie les playbook de templates dans le dossieer du client
+Copy-Item $playbookPath $clientPath
+
+# Obtien la derniere address IP de next.txt puis incrémente 
+# les address et les mets à jours dans le VagrantFile
+# qui est mis dans le dossier client.
 $IPv4 = Get-Content $ipPath
-$fileContent = Get-Content -Path ($templatePath + "VagrantFile") -Raw
-cp -r ($templatePath + "playbook") $clientConfigPath
+$fileContent = Get-Content -Path $templateVagrantPath -Raw
 
-Add-Content -Path ($configPath + "/HOST") -Value "[$Client]"
+Add-Content -Path $hostPath -Value $bracketClient
+Add-Content -Path $clienthostPath -Value $bracketClient
+
 for ($i = 0; $i -lt $vmNumber; $i++) {
     $stringToReplace = "{{IP" + ($i + 1) + "}}"
 
     $newIP = (ipUpdate -ip $IPv4 -increment $i)
-    Add-Content -Path ($configPath + "/HOST") -Value $newIP
+    Add-Content -Path $hostPath -Value $newIP
+    Add-Content -Path $clienthostPath -Value $newIP
+
     $fileContent = $fileContent -replace $stringToReplace, $newIp
 
+    # mets an mémoire les deux première ip pour 
+    # l'ajout dans le fichier hosts
     switch ($i) {
         1 { $httpdIP = $newIP }
         2 { $apiIP = $newIP }
     }
 }
-
+#sauvegarde le VagrantFile dans le dossier du client
 $fileContent | Set-Content -Path $vagrantPath
 
+# Mets à jours le contenue de next.txt 
 Set-Content -Path $ipPath -Value (ipUpdate -ip $IPv4 -increment ($vmNumber))
 
+# Prompt pour demander à l'utilisatueur si veut ajouter 
+# client.com et api.client.com au fichier hosts du systeme
 $Cursor = [System.Console]::CursorTop
 Do {
     [System.Console]::CursorTop = $Cursor
-    $addHost = Read-Host -Prompt 'Voulez-vous ajouter $Client.com et $api.$Client.com au fichier hosts (y/n)'
+    $addHost = Read-Host -Prompt "Voulez-vous ajouter $Client.com et 
+    api.$Client.com au fichier hosts (y/n)"
 }
 Until ($addHost -eq 'y' -or $addHost -eq 'n')
 
+# Génere le contenue qui sera ajouter au hôte
+$hostContent = "`n$httpdIP `t$Client.com`n$apiIP `tapi.$Client.com"
+# Copie le fichier template addtohost en mémoire, 
+$fileContent = Get-Content -Path $templatePath$addtohostfile -Raw
+# remplace {{HOSTINFO}} avec le contenue de $hostconteent
+$fileContent = $fileContent -replace "{{HOSTSINFO}}", "`"$hostContent`""
+# créer le fichier  C:/travail/commun/config/$client/addtohost.ps1
+$fileContent | Set-Content -Path $addtohostPath
+
+# Demande si veut ajouter au fichier hosts dy systeme d'operation
 if ($addHost -eq 'y') {
-    $hostContent = "$httpdIP `t$Client.com`n$apiIP `tapi.$Client.com"
+
     if ($IsWindows) {
-Start-Process powershell -Verb runAs -ArgumentList "-NoProfile -ExecutionPolicy Bypass -Command { Add-Content -Path `"$syshostsPath`" -Value `"$hostContent`" }"
+
+        $fileContent = Get-Content -Path $templatePath$winHostFile -Raw
+        $fileContent = $fileContent -replace "{{HOSTSINFO}}", "`"$hostContent`""
+        $fileContent | Set-Content -Path $commonPath$winHostFile
+
+        Read-Host -Prompt "Une nouvelle fenêtre s'ouvrira pour faire l'ajout dans le fichier host`nSi demander, Accepter pour faire l'ajout."
+        # execute le fichier dans fenetre avec les permision administrateur.
+        # Doit écrire le chemin au complet sinon ne fonctionnera pas
+        Start-Process powershell -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"C:/travail/commun/winhost.ps1`"" -Verb runAs
     }
-    else {            
+    else {
+        Write-Output "Veuillez entrez votre mots de passe pour faire l'ajout dans le fichier hosts."        
         $hostContent | sudo tee -a $syshostsPath
     }
 }
