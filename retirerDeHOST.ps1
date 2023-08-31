@@ -17,7 +17,7 @@ else {
 $commonPath = $installPathOS + 'travail/commun/'
 $configPath = $commonPath + 'config/'
 $vagrantHosts = $configPath + ".hosts/"
-$hostFile = "HOST"
+$hostFile = "HOSTS"
 
 #variable de chemin des fichiers
 $hostPath = $configPath + $hostFile
@@ -44,16 +44,15 @@ do {
 $vagrantHostsFile = $vagrantHosts + $client
 
 $contentToRemove = Get-Content -Path $vagrantHostsFile
-$hostPath
 $contentToClean = Get-Content -Path $hostPath
 
+$contentToClean
 $newContent = @()
 foreach ($line in $contentToClean) {
     if ($contentToRemove -notcontains $line) {
         $newContent += $line
     }
 }
-
 $newContent | Set-Content -Path $hostPath
 Remove-Item $vagrantHostsFile
 Write-Output "Fichier HOST Nettoyer"

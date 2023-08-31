@@ -73,7 +73,7 @@ foreach ($path in $paths) {
 }
 
 #variable de nom de fichier utiliser dans le script
-$hostFile = "/HOST"
+$hostFile = "/HOSTS"
 $VagrantFile = "/VagrantFile"
 $addtohostfile = "addtohost.ps1"
 $winHostFile = "winhost.ps1"
