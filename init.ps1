@@ -49,6 +49,22 @@ function replaceInFile {
     $replaceInFileContent | Set-Content -Path $fileInput
 }
 
+#variable de nom de fichier utiliser dans le script
+$hostFile = "/HOSTS"
+$VagrantFile = "VagrantFile"
+$addtohostfile = "addtohost.ps1"
+$winHostFile = "winhost.ps1"
+$apiPB = "api-install.yml"
+$dbAddUserPB = "db-add-user.yml"
+$dbConfigurePB = "db-configure.yml"
+$dbInstallPB = "db-install.yml"
+$httdPB = "httpd-install.yml"
+$setupPB = "setup.sh"
+$updatePB = "update.yml"
+$workDir = "travail/"
+$commonDir = "commun/"
+$configDir = "config/"
+$templateDir = "template/"
 
 # Dossier Racine pour la localisation des scripts et fichiers
 if ($IsWindows) {
@@ -65,32 +81,18 @@ $vmNumber = 3;
 $client = Read-Host -Prompt 'Insérer le nom du client'
 
 # génére  $installPath et si les dossier n'existee pas les crée
-$paths = @('travail', 'commun', 'config', $client)
+$paths = @($workDir, $commonDir, $configDir, $client)
 $installPath = $installPathOS
 foreach ($path in $paths) {
     $installPath = $installPath + $path + '/'
     createIfNotExist -path $installPath
 }
 
-#variable de nom de fichier utiliser dans le script
-$hostFile = "/HOSTS"
-$VagrantFile = "/VagrantFile"
-$addtohostfile = "addtohost.ps1"
-$winHostFile = "winhost.ps1"
-$apiPB = "api-install.yml"
-$dbAddUserPB = "db-add-user.yml"
-$dbConfigurePB = "db-configure.yml"
-$dbInstallPB = "db-install.yml"
-$httdPB = "httpd-install.yml"
-$setupPB = "setup.sh"
-$updatePB = "update.yml"
-
 #variable de chemin  utiliser dans le script
-$commonPath = $installPathOS + 'travail/commun/'
-$configPath = $commonPath + 'config/'
-$templatePath = $commonPath + "template/"
+$commonPath = $installPathOS + $workDir + $commonDir
+$configPath = $commonPath + $configDir
+$templatePath = $commonPath + $templateDir
 $vagrantHosts = $configPath + ".hosts/"
-
 
 #variable de chemin des fichiers
 $ipPath = $commonPath + "next.txt"
@@ -98,10 +100,13 @@ $templateClientPath = $templatePath + "client"
 $playbookPath = $templatePath + "playbook"
 $clientPlaybookPath = $installPath + "playbook/"
 $hostPath = $configPath + $hostFile
-$vagrantPath = $installPath + $VagrantFile
+$vagrantPath = $commonPath + $client + "/" + $VagrantFile
 ### $clienthostPath = $installPath + $hostFile
 $addtohostPath = $installPath + $addtohostfile
 $vagrantHostsFile = $VagrantHosts + $client
+
+Write-Output $commonPath$client
+createIfNotExist -Path $commonPath$client
 
 #utiliser pour le fichier HOST de Ansible
 $bracketClient = "[$client]"
@@ -109,6 +114,9 @@ Copy-Item -Path "$templateClientPath\*" -Destination $installPath -Recurse -Forc
 
 #copie les playbook de templates dans le dossieer du client
 Copy-Item -r $playbookPath $installPath
+
+
+Copy-Item  -Path $templatePath$vagrantFile -Destination $vagrantPath
 
 # remplace {{CLIENT} dans les fichiers playbook avec le nom du client
 replaceInFile -fileInput $clientPlaybookPath$setupPB -toReplace "{{CLIENT}}" -replacement $client 
