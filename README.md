@@ -1,8 +1,11 @@
 # IMPORTANT
-le script pour configure postgres ne fonctionne pas, retourne plusieur erreur à chaque essaie que j'ai tenté/
+le playbook db-configure cause postegresql a failed pour se relancer
+le playbook db-add-user timeeout pour l'authentification.
 
-## Étape manuelle si fonctionnait.
+
+## Étape manuelle si fonctionnait pour tester la connection
 1 - Éxecuter init.ps1
+ - suivre les prompts à l'écran
 2 - Se connecter à ansible
 3 - lancer ~/config/client/playbook/setup.sh
 3 - se conneter en ssh au serveur API
