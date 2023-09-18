@@ -63,6 +63,7 @@ $setupPB = "setup.sh"
 $updatePB = "update.yml"
 $workDir = "travail/"
 $commonDir = "commun/"
+$newTechDir ="newtech/"
 $configDir = "config/"
 $templateDir = "template/"
 
@@ -90,6 +91,8 @@ foreach ($path in $paths) {
 
 #variable de chemin  utiliser dans le script
 $commonPath = $installPathOS + $workDir + $commonDir
+$newTechPath = $installPathOS + $workDir + $newTechDir
+
 $configPath = $commonPath + $configDir
 $templatePath = $commonPath + $templateDir
 $vagrantHosts = $configPath + ".hosts/"
@@ -100,13 +103,14 @@ $templateClientPath = $templatePath + "client"
 $playbookPath = $templatePath + "playbook"
 $clientPlaybookPath = $installPath + "playbook/"
 $hostPath = $configPath + $hostFile
-$vagrantPath = $commonPath + $client + "/" + $VagrantFile
+$vagrantPath = $newTechPath + $client + "/" + $VagrantFile
 ### $clienthostPath = $installPath + $hostFile
 $addtohostPath = $installPath + $addtohostfile
 $vagrantHostsFile = $VagrantHosts + $client
 
 Write-Output $commonPath$client
-createIfNotExist -Path $commonPath$client
+createIfNotExist -Path $newTechPath$client
+
 
 #utiliser pour le fichier HOST de Ansible
 $bracketClient = "[$client]"
@@ -159,7 +163,8 @@ for ($i = 0; $i -lt $vmNumber; $i++) {
             replaceInFile -fileInput $clientPlaybookPath$setupPB -toReplace $stringToReplace -replacement $newIP 
             replaceInFile -fileInput $clientPlaybookPath$dbinstallPB -toReplace $stringToReplace -replacement $newIP 
             replaceInFile -fileInput $clientPlaybookPath$dbConfigurePB -toReplace $stringToReplace -replacement $newIP 
-            replaceInFile -fileInput $clientPlaybookPath$dbAddUserPB -toReplace $stringToReplace -replacement $newIP 
+            replaceInFile -fileInput $clientPlaybookPath$dbAddUserPB -toReplace $stringToReplace -replacement $newIP
+            replaceInFile -fileInput $clientPlaybookPath$apiPB -toReplace $stringToReplace -replacement $newIP  
         }
     }
 }
@@ -213,3 +218,10 @@ if ($addHost -eq 'y') {
         $hostContent | sudo tee -a $syshostsPath
     }
 }
+
+Write-Output "Préparation des Machines virtuelle"  
+cd $newTechPath$client 
+vagrant up --provision
+cd $commonPath
+Write-Output "Préparation Compléte, connecté vous à votre machine Ansible pour procéder au provisionning des autres machines créer"  
+Write-Output "Vous trouverer les fichier de configurations dans ~/config/$client/playbook/setup.sh"

@@ -3,3 +3,4 @@
 .vagrant
 config/HOST
 /config/*/
+config/ssh-copy-id.log
