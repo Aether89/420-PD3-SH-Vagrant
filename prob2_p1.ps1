@@ -50,8 +50,11 @@ function replaceInFile {
 }
 
 #variable de nom de fichier utiliser dans le script
+$myOrg = "NewTech"
 $hostFile = "/HOSTS"
 $VagrantFile = "VagrantFile"
+$srcFile = "src"
+$gitignoreFile = ".gitignore"
 $addtohostfile = "addtohost.ps1"
 $winHostFile = "winhost.ps1"
 $apiPB = "api-install.yml"
@@ -89,6 +92,7 @@ foreach ($path in $paths) {
 }
 
 #variable de chemin  utiliser dans le script
+$workPath = $installPathOS + $workDir
 $commonPath = $installPathOS + $workDir + $commonDir
 $configPath = $commonPath + $configDir
 $templatePath = $commonPath + $templateDir
@@ -100,13 +104,16 @@ $templateClientPath = $templatePath + "client"
 $playbookPath = $templatePath + "playbook"
 $clientPlaybookPath = $installPath + "playbook/"
 $hostPath = $configPath + $hostFile
-$vagrantPath = $commonPath + $client + "/" + $VagrantFile
+$clientPath = $workPath + $client
+$vagrantPath = $clientPath + "/" + $VagrantFile
+$gitignorePath = $clientPath + "/" + $gitignoreFile
+$srcPath = $clientPath + "/src"
 ### $clienthostPath = $installPath + $hostFile
 $addtohostPath = $installPath + $addtohostfile
 $vagrantHostsFile = $VagrantHosts + $client
 
-Write-Output $commonPath$client
-createIfNotExist -Path $commonPath$client
+Write-Output $clientPath
+createIfNotExist -Path $clientPath
 
 #utiliser pour le fichier HOST de Ansible
 $bracketClient = "[$client]"
@@ -117,6 +124,8 @@ Copy-Item -r $playbookPath $installPath
 
 
 Copy-Item  -Path $templatePath$vagrantFile -Destination $vagrantPath
+Copy-Item  -r -Path $templatePath$srcFile -Destination $srcPath
+Copy-Item -Path $templatePath$gitignoreFile -Destination $gitignorePath
 
 # remplace {{CLIENT} dans les fichiers playbook avec le nom du client
 replaceInFile -fileInput $clientPlaybookPath$setupPB -toReplace "{{CLIENT}}" -replacement $client 
@@ -213,3 +222,35 @@ if ($addHost -eq 'y') {
         $hostContent | sudo tee -a $syshostsPath
     }
 }
+
+cd $clientPath
+$date = Get-Date -Format "yyyy-MM-dd HH:mm"
+$readmeContent = "# Read Me $client
+$date
+## Prérequis
+- vagrant
+- azure 
+- git
+- github cli
+"
+
+Set-Content -Path "$clientPath/README.md" -Value $readmeContent
+
+git init
+git add .
+git commit -m "Initial commit"
+
+Do {
+    [System.Console]::CursorTop = $Cursor
+    $commitGitHub = Read-Host -Prompt "Voulez-vous pousser le répertoire sur GitHub?(y/n)"
+}
+Until ($commitGitHub -eq 'y' -or $commitGitHub -eq 'n')
+
+if ($commitGitHub -eq 'y') {
+$response = gh repo create "$myOrg-$client" --public --source $clientPath --push
+$pushedCommits = $response -split "branch" | Select-Object -First 1
+write-host "rsult"
+write-host "$pushedCommits.git"
+}
+
+cd $commonPath

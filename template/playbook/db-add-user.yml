@@ -1,22 +1,18 @@
 ---
-- name: Create Newtech user and database
+- name: Create Newtech database and user in PostgreSQL
   hosts: {{IP3}}
   become: yes
+  become_method: su
+  become_user: postgres
 
   tasks:
     - name: Create NewTech database
-      mysql_db:
+      postgresql_db:
         name: NewTech
         state: present
-        login_user: root
-        login_password: ChuckIsGreat543
-    
+
     - name: Create NewTechUsr user
-      mysql_user:
+      postgresql_user:
         name: NewTechUsr
-        host: '%'
         password: lopl8788
-        priv: "NewTech.*:ALL"
-        state: present
-        login_user: root
-        login_password: ChuckIsGreat543
+        encrypted: yes

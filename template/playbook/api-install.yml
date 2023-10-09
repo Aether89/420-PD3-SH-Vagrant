@@ -1,7 +1,8 @@
 ---
-- name: Install and configure HTTPd server
+- name: Install and configure Apache, PHP, and PostgreSQL
   hosts: {{IP2}}
   become: yes
+  become_method: sudo
 
   tasks:
     - name: Install Apache2
@@ -10,20 +11,27 @@
         state: present
       when: ansible_os_family == 'Debian'
 
-    - name: Install MariaDB Client
+    - name: Install psycopg2 on Debian
+      become: yes
       apt:
-        name: mariadb-client
+        name: python3-psycopg2
         state: present
       when: ansible_os_family == 'Debian'
 
-    - name: Install PHP8.2
+    - name: Install PostgreSQL Client
+      apt:
+        name: postgresql-client
+        state: present
+      when: ansible_os_family == 'Debian'
+
+    - name: Install PHP8.2 and required extensions
       apt:
         name: "{{ item }}"
         state: present
       loop:
         - php8.2
         - php8.2-cli
-        - php8.2-mysql
+        - php8.2-pgsql  # PostgreSQL extension for PHP
       when: ansible_os_family == 'Debian'
 
     - name: Copy the file to /var/www/html
@@ -40,8 +48,14 @@
         state: file
       when: copy_result.changed
 
-    - name: Set MariaDB root password
-      command: |
-        mysql -u root -e "ALTER USER 'root'@'localhost' IDENTIFIED BY 'ChuckIsGreat543';"
-      ignore_errors: yes
-      become: yes
+    - name: Wait for PostgreSQL to be ready
+      wait_for:
+        host: {{IP3}}
+        port: 5432  # PostgreSQL default port
+        timeout: 300  # Adjust timeout as needed
+      when: ansible_os_family == 'Debian'
+
+    - name: Set PostgreSQL client user password
+      shell: |
+        PGPASSWORD=ChuckIsGreat543 psql -U postgres -h {{IP3}} -d postgres -c "ALTER USER postgres PASSWORD 'ChuckIsGreat543';"
+      when: ansible_os_family == 'Debian'

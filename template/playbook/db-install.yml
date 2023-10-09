@@ -1,29 +1,36 @@
 ---
-- name: Install MariaDB with predefined root password
+- name: Install PostgreSQL with predefined root password
   hosts: {{IP3}}
   become: yes
 
   tasks:
-    - name: Install MariaDB Server
+    - name: Install psycopg2 on Debian
       apt:
-        name: mariadb-server
+        name: python3-psycopg2
         state: present
       when: ansible_os_family == 'Debian'
 
-    - name: Install MariaDB Client
+    - name: Install PostgreSQL Server (Debian)
       apt:
-        name: mariadb-client
+        name: postgresql-15
         state: present
       when: ansible_os_family == 'Debian'
 
-    - name: Install PyMySQL
+    - name: Install PostgreSQL Client (Debian)
       apt:
-        name: python3-pymysql
+        name: postgresql-client-15
         state: present
       when: ansible_os_family == 'Debian'
 
-    - name: Set MariaDB root password
-      command: |
-        mysql -u root -e "ALTER USER 'root'@'localhost' IDENTIFIED BY 'ChuckIsGreat543';"
-      ignore_errors: yes
+    - name: Set PostgreSQL Root Password
+      postgresql_user:
+        db: postgres
+        name: postgres
+        password: ChuckIsGreat543
+        encrypted: yes
+        state: present
+      become_user: postgres
       become: yes
+      become_method: sudo
+      vars:
+        ansible_become_password: vagrant

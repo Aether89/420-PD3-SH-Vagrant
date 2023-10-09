@@ -15,3 +15,10 @@
         autoremove: yes
         autoclean: yes
       when: ansible_os_family == 'Debian'
+      
+    - name: Install required packaged
+      apt:
+        name: "{{ item }}"
+        state: present
+      with_items:
+        - acl
