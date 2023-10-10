@@ -170,15 +170,15 @@ connect-azaccount
 
 # HTTPD
 Write-Output "Création de la VM HTTPD"
-$httpdIP = createAZVM -name "httpd" -ip
+$httpdIP = createAZVM -name "httpd"
 
 # API
 write-Output "Création de la VM API"
-CreateAZVM -name "api" -ip $apidIP
+$apiIP =CreateAZVM -name "api"
 
 # DB 
 Write-Output "Création de la VM DB"
-CreateAZVM -name "db" -ip $dbdIP
+$dbIP = CreateAZVM -name "db"
 
 # Obtien la derniere address IP de next.txt puis incrémente 
 # les address et les mets à jours dans le VagrantFile
