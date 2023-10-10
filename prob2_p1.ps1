@@ -49,17 +49,41 @@ function replaceInFile {
     $replaceInFileContent | Set-Content -Path $fileInput
 }
 
-#variable de nom de fichier utiliser dans le script
+function createAZVM {
+    param (
+        [string] $name,
+        [string] $ip
+    )
+$resourceGroupName = $myOrg + "Production"
+$vmName = $client + "-" + $name
+$netName = $client + "-vnet"
+$ipName = $vmName + "IP"
+$adminUser = Read-Host -Prompt 'Insérer le nom du compte Administrateur'
+$passPrompt = Read-Host -Prompt 'Insérer le mots de passe du compte Administrateur'
+$adminPass = ConvertTo-SecureString -String $passPrompt -AsPlainText -Force
+$credential = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $adminUser, $adminPass
+
+new-azvm -ResourceGroupName $resourceGroupName -Name $vmName -ImageName $vmOS -Size $vmSize -location $vmLocation -VirtualNetworkName $netName -publicIpAddressName $ipName -OpenPorts 22,80,443 -Credential $credential
+$ip = Get-AzPublicIPAddress -Name $ipName -ResourceGroupName $resourceGroupName | Select-Object -ExpandProperty IpAddress
+}
+
+# Variale de configuration pour les machines virtuelles
+$vmOS = "Ubuntu2204"
+$vmSize = "Standard_B1ls"
+$vmLocation = "canadacentral"
 $myOrg = "NewTech"
+$pushedCommits = "https://github.com/Aether89/NewTech-Default"
+#variable de nom de fichier utiliser dans le script
+$date = Get-Date -Format "yyyy-MM-dd HH:mm"
+
 $hostFile = "/HOSTS"
 $VagrantFile = "VagrantFile"
 $srcFile = "src"
 $gitignoreFile = ".gitignore"
+$readmeFile = "README.md"
 $addtohostfile = "addtohost.ps1"
 $winHostFile = "winhost.ps1"
 $apiPB = "api-install.yml"
-$dbAddUserPB = "db-add-user.yml"
-$dbConfigurePB = "db-configure.yml"
 $dbInstallPB = "db-install.yml"
 $httdPB = "httpd-install.yml"
 $setupPB = "setup.sh"
@@ -83,7 +107,7 @@ $vmNumber = 3;
 
 $client = Read-Host -Prompt 'Insérer le nom du client'
 
-# génére  $installPath et si les dossier n'existee pas les crée
+# génére  $installPath et si les dossier n'existe pas les crée
 $paths = @($workDir, $commonDir, $configDir, $client)
 $installPath = $installPathOS
 foreach ($path in $paths) {
@@ -107,6 +131,7 @@ $hostPath = $configPath + $hostFile
 $clientPath = $workPath + $client
 $vagrantPath = $clientPath + "/" + $VagrantFile
 $gitignorePath = $clientPath + "/" + $gitignoreFile
+$readmePath = $clientPath + "/" + $readmeFile
 $srcPath = $clientPath + "/src"
 ### $clienthostPath = $installPath + $hostFile
 $addtohostPath = $installPath + $addtohostfile
@@ -123,14 +148,32 @@ Copy-Item -Path "$templateClientPath\*" -Destination $installPath -Recurse -Forc
 Copy-Item -r $playbookPath $installPath
 
 
-Copy-Item  -Path $templatePath$vagrantFile -Destination $vagrantPath
 Copy-Item  -r -Path $templatePath$srcFile -Destination $srcPath
 Copy-Item -Path $templatePath$gitignoreFile -Destination $gitignorePath
+Copy-Item -Path $templatePath$readmeFile -Destination $readmePath
+
+replaceInFile -fileInput $readmePath -toReplace "{{DATE}}" -replacement $date 
+replaceInFile -fileInput $readmePath -toReplace "{{CLIENT}}" -replacement $client 
 
 # remplace {{CLIENT} dans les fichiers playbook avec le nom du client
 replaceInFile -fileInput $clientPlaybookPath$setupPB -toReplace "{{CLIENT}}" -replacement $client 
 replaceInFile -fileInput $clientPlaybookPath$updatePB -toReplace "{{CLIENT}}" -replacement $client 
 
+# Connection à Azure
+Write-Output "Veuillez vous connecter à Azure"
+connect-azaccount
+
+# HTTPD
+Write-Output "Création de la VM HTTPD"
+createAZVM -name "httpd" -ip $httpdIP
+
+# API
+write-Output "Création de la VM API"
+createAZVM -name "api" -ip $apidIP
+
+# DB 
+Write-Output "Création de la VM DB"
+createAZVM -name "db" -ip $dbdIP
 
 # Obtien la derniere address IP de next.txt puis incrémente 
 # les address et les mets à jours dans le VagrantFile
@@ -145,30 +188,33 @@ Add-Content -Path $vagrantHostsFile -Value $bracketClient
 for ($i = 0; $i -lt $vmNumber; $i++) {
     $stringToReplace = "{{IP" + ($i + 1) + "}}"
 
-    $newIP = (ipUpdate -ip $IPv4 -increment $i)
-    Add-Content -Path $hostPath -Value $newIP
-    Add-Content -Path $vagrantHostsFile -Value $newIP
-
-    $fileContent = $fileContent -replace $stringToReplace, $newIp
-
-    # mets an mémoire les deux première ip pour 
-    # l'ajout dans le fichier hosts
     switch ($i) {
         0 {
-            $httpdIP = $newIP
-            replaceInFile -fileInput $clientPlaybookPath$setupPB -toReplace $stringToReplace -replacement $newIP 
-            replaceInFile -fileInput $clientPlaybookPath$httdPB -toReplace $stringToReplace -replacement $newIP 
+            Add-Content -Path $hostPath -Value $httpdIP
+            Add-Content -Path $vagrantHostsFile -Value $httpdIP
+        
+            $fileContent = $fileContent -replace $stringToReplace, $httpdIP
+
+            replaceInFile -fileInput $clientPlaybookPath$setupPB -toReplace $stringToReplace -replacement $httpdIP 
+            replaceInFile -fileInput $clientPlaybookPath$httdPB -toReplace $stringToReplace -replacement $httpdIP 
         }
         1 {
-            $apiIP = $newIP 
-            replaceInFile -fileInput $clientPlaybookPath$setupPB -toReplace $stringToReplace -replacement $newIP 
-            replaceInFile -fileInput $clientPlaybookPath$apiPB -toReplace $stringToReplace -replacement $newIP 
+            Add-Content -Path $hostPath -Value $apiIP
+            Add-Content -Path $vagrantHostsFile -Value $apiIP
+        
+            $fileContent = $fileContent -replace $stringToReplace, $apiIP
+
+            replaceInFile -fileInput $clientPlaybookPath$setupPB -toReplace $stringToReplace -replacement $apiIP 
+            replaceInFile -fileInput $clientPlaybookPath$apiPB -toReplace $stringToReplace -replacement $apiIP 
         }
         2 {
-            replaceInFile -fileInput $clientPlaybookPath$setupPB -toReplace $stringToReplace -replacement $newIP 
-            replaceInFile -fileInput $clientPlaybookPath$dbinstallPB -toReplace $stringToReplace -replacement $newIP 
-            replaceInFile -fileInput $clientPlaybookPath$dbConfigurePB -toReplace $stringToReplace -replacement $newIP 
-            replaceInFile -fileInput $clientPlaybookPath$dbAddUserPB -toReplace $stringToReplace -replacement $newIP 
+            Add-Content -Path $hostPath -Value $dbIP
+            Add-Content -Path $vagrantHostsFile -Value $dbIP
+        
+            $fileContent = $fileContent -replace $stringToReplace, $dbIP
+
+            replaceInFile -fileInput $clientPlaybookPath$setupPB -toReplace $stringToReplace -replacement $dbIP 
+            replaceInFile -fileInput $clientPlaybookPath$dbinstallPB -toReplace $stringToReplace -replacement $dbIP 
         }
     }
 }
@@ -224,17 +270,6 @@ if ($addHost -eq 'y') {
 }
 
 cd $clientPath
-$date = Get-Date -Format "yyyy-MM-dd HH:mm"
-$readmeContent = "# Read Me $client
-$date
-## Prérequis
-- vagrant
-- azure 
-- git
-- github cli
-"
-
-Set-Content -Path "$clientPath/README.md" -Value $readmeContent
 
 git init
 git add .
@@ -249,8 +284,8 @@ Until ($commitGitHub -eq 'y' -or $commitGitHub -eq 'n')
 if ($commitGitHub -eq 'y') {
 $response = gh repo create "$myOrg-$client" --public --source $clientPath --push
 $pushedCommits = $response -split "branch" | Select-Object -First 1
-write-host "rsult"
 write-host "$pushedCommits.git"
 }
+replaceInFile -fileInput $clientPlaybookPath$setupPB -toReplace "{{GITHUB}}" -replacement "$pushedCommits.git"
 
 cd $commonPath

@@ -1,4 +1,8 @@
 ---
+# NewTech First Problematic
+#
+# Install HTTPd server for static Web server
+
 - name: Install and configure HTTPd server
   hosts: {{IP1}}
   become: yes
@@ -8,4 +12,25 @@
       apt:
         name: apache2
         state: present
-      when: ansible_os_family == 'Debian'
+
+- name: Delete all files and subdirectories in /var/www/html
+  file:
+    path: "/var/www/html/{{ item }}"
+    state: absent
+  with_fileglob:
+    - "/var/www/html/*"
+
+- name: Recreate /var/www/html directory
+  file:
+    path: "/var/www/html"
+    state: directory
+    mode: '0755'
+
+- name: Checkout repo on remote node
+  git:
+    repo: '{{GITHUB}}'
+    dest: '~/git/{{CLIENT}}'
+
+- name: Copy file to desired location
+  command:
+   cmd: cp -r ~/git/{{CLIENT}}/src /var/www/html
