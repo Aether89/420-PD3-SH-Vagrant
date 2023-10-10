@@ -2,9 +2,9 @@
 
 ssh-keygen -t rsa -C "andrew@ways2code.com" -N "" -f ~/.ssh/id_rsa
 
-ssh-copy-id vagrant@{{IP1}}
-ssh-copy-id vagrant@{{IP2}}
-ssh-copy-id vagrant@{{IP3}}
+ssh-copy-id {{HTTPDADMIN}}@{{IP1}}
+ssh-copy-id {{APIADMIN}}@{{IP2}}
+ssh-copy-id {{DBADMIN}}@{{IP3}}
 
 ansible-playbook -i /home/vagrant/config/HOSTS /home/vagrant/config/{{CLIENT}}/playbook/update.yml
 ansible-playbook -i /home/vagrant/config/HOSTS /home/vagrant/config/{{CLIENT}}/playbook/httpd-install.yml

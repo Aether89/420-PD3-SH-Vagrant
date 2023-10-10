@@ -51,8 +51,7 @@ function replaceInFile {
 
 function createAZVM {
     param (
-        [string] $name,
-        [string] $ip
+        [string] $name
     )
 $resourceGroupName = $myOrg + "Production"
 $vmName = $client + "-" + $name
@@ -64,7 +63,13 @@ $adminPass = ConvertTo-SecureString -String $passPrompt -AsPlainText -Force
 $credential = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $adminUser, $adminPass
 
 new-azvm -ResourceGroupName $resourceGroupName -Name $vmName -ImageName $vmOS -Size $vmSize -location $vmLocation -VirtualNetworkName $netName -publicIpAddressName $ipName -OpenPorts 22,80,443 -Credential $credential
-$ip = Get-AzPublicIPAddress -Name $ipName -ResourceGroupName $resourceGroupName | Select-Object -ExpandProperty IpAddress
+$ipResult = Get-AzPublicIPAddress -Name $ipName -ResourceGroupName $resourceGroupName | Select-Object -ExpandProperty IpAddress
+
+$myObject = New-Object -TypeName PSObject -Property @{
+    admin = $adminUser
+    ip = $ipResult
+}
+return $myObject
 }
 
 # Variale de configuration pour les machines virtuelles
@@ -165,21 +170,20 @@ connect-azaccount
 
 # HTTPD
 Write-Output "Création de la VM HTTPD"
-createAZVM -name "httpd" -ip $httpdIP
+$httpdIP = createAZVM -name "httpd" -ip
 
 # API
 write-Output "Création de la VM API"
-createAZVM -name "api" -ip $apidIP
+CreateAZVM -name "api" -ip $apidIP
 
 # DB 
 Write-Output "Création de la VM DB"
-createAZVM -name "db" -ip $dbdIP
+CreateAZVM -name "db" -ip $dbdIP
 
 # Obtien la derniere address IP de next.txt puis incrémente 
 # les address et les mets à jours dans le VagrantFile
 # qui est mis dans le dossier client.
 $IPv4 = Get-Content $ipPath
-$fileContent = Get-Content -Path $vagrantPath -Raw
 
 Add-Content -Path $hostPath -Value $bracketClient
 createIfNotExist -path $vagrantHosts
@@ -190,34 +194,34 @@ for ($i = 0; $i -lt $vmNumber; $i++) {
 
     switch ($i) {
         0 {
-            Add-Content -Path $hostPath -Value $httpdIP
-            Add-Content -Path $vagrantHostsFile -Value $httpdIP
+            Add-Content -Path $hostPath -Value $httpdIP.ip
+            Add-Content -Path $vagrantHostsFile -Value $httpdIP.ip
         
-            $fileContent = $fileContent -replace $stringToReplace, $httpdIP
-
-            replaceInFile -fileInput $clientPlaybookPath$setupPB -toReplace $stringToReplace -replacement $httpdIP 
-            replaceInFile -fileInput $clientPlaybookPath$httdPB -toReplace $stringToReplace -replacement $httpdIP 
+            replaceInFile -fileInput $clientPlaybookPath$setupPB -toReplace $stringToReplace -replacement $httpdIP.ip
+            replaceInFile -fileInput $clientPlaybookPath$httdPB -toReplace $stringToReplace -replacement $httpdIP.ip
         }
         1 {
-            Add-Content -Path $hostPath -Value $apiIP
-            Add-Content -Path $vagrantHostsFile -Value $apiIP
+            Add-Content -Path $hostPath -Value $apiIP.ip
+            Add-Content -Path $vagrantHostsFile -Value $apiIP.ip
         
-            $fileContent = $fileContent -replace $stringToReplace, $apiIP
-
-            replaceInFile -fileInput $clientPlaybookPath$setupPB -toReplace $stringToReplace -replacement $apiIP 
-            replaceInFile -fileInput $clientPlaybookPath$apiPB -toReplace $stringToReplace -replacement $apiIP 
+            replaceInFile -fileInput $clientPlaybookPath$setupPB -toReplace $stringToReplace -replacement $apiIP.ip
+            replaceInFile -fileInput $clientPlaybookPath$apiPB -toReplace $stringToReplace -replacement $apiIP.ip
         }
         2 {
-            Add-Content -Path $hostPath -Value $dbIP
-            Add-Content -Path $vagrantHostsFile -Value $dbIP
+            Add-Content -Path $hostPath -Value $dbIP.ip
+            Add-Content -Path $vagrantHostsFile -Value $dbIP.ip
         
-            $fileContent = $fileContent -replace $stringToReplace, $dbIP
-
-            replaceInFile -fileInput $clientPlaybookPath$setupPB -toReplace $stringToReplace -replacement $dbIP 
-            replaceInFile -fileInput $clientPlaybookPath$dbinstallPB -toReplace $stringToReplace -replacement $dbIP 
+            replaceInFile -fileInput $clientPlaybookPath$setupPB -toReplace $stringToReplace -replacement $dbIP.ip
+            replaceInFile -fileInput $clientPlaybookPath$dbinstallPB -toReplace $stringToReplace -replacement $dbIP.ip
         }
     }
 }
+
+replaceInFile -fileInput $clientPlaybookPath$setupPB -toReplace "{{HTTPDADMIN}}" -replacement $httpdIP.admin
+replaceInFile -fileInput $clientPlaybookPath$setupPB -toReplace "{{APIADMIN}}" -replacement $apiIP.admin
+replaceInFile -fileInput $clientPlaybookPath$setupPB -toReplace "{{DBADMIN}}" -replacement $dbIP.admin
+
+
 #sauvegarde le VagrantFile dans le dossier du client
 $fileContent | Set-Content -Path $vagrantPath
 
