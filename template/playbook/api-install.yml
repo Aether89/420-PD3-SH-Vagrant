@@ -5,8 +5,10 @@
 # API context.
 
 - name: Install and configure HTTPd server
-  hosts: {{iP2}}
+  hosts: {{IP2}}
   become: yes
+  vars:
+      ansible_user: {{APIADMIN}}
 
   tasks:
     - name: Install Apache2

@@ -57,12 +57,13 @@ $resourceGroupName = $myOrg + "Production"
 $vmName = $client + "-" + $name
 $netName = $client + "-vnet"
 $ipName = $vmName + "IP"
+$subnetName = $client + "-subnet"
 $adminUser = Read-Host -Prompt 'Insérer le nom du compte Administrateur'
 $passPrompt = Read-Host -Prompt 'Insérer le mots de passe du compte Administrateur'
 $adminPass = ConvertTo-SecureString -String $passPrompt -AsPlainText -Force
 $credential = New-Object -TypeName System.Management.Automation.PSCredential -ArgumentList $adminUser, $adminPass
 
-new-azvm -ResourceGroupName $resourceGroupName -Name $vmName -ImageName $vmOS -Size $vmSize -location $vmLocation -VirtualNetworkName $netName -publicIpAddressName $ipName -OpenPorts 22,80,443 -Credential $credential
+new-azvm -ResourceGroupName $resourceGroupName -Name $vmName -ImageName $vmOS -Size $vmSize -location $vmLocation -VirtualNetworkName $netName -publicIpAddressName $ipName  -SubnetName $subnetName -OpenPorts 22,80,443 -Credential $credential 
 $ipResult = Get-AzPublicIPAddress -Name $ipName -ResourceGroupName $resourceGroupName | Select-Object -ExpandProperty IpAddress
 
 $myObject = New-Object -TypeName PSObject -Property @{
@@ -137,7 +138,7 @@ $clientPath = $workPath + $client
 $vagrantPath = $clientPath + "/" + $VagrantFile
 $gitignorePath = $clientPath + "/" + $gitignoreFile
 $readmePath = $clientPath + "/" + $readmeFile
-$srcPath = $clientPath + "/src"
+$srcPath = $clientPath + "/"
 ### $clienthostPath = $installPath + $hostFile
 $addtohostPath = $installPath + $addtohostfile
 $vagrantHostsFile = $VagrantHosts + $client
@@ -152,8 +153,7 @@ Copy-Item -Path "$templateClientPath\*" -Destination $installPath -Recurse -Forc
 #copie les playbook de templates dans le dossieer du client
 Copy-Item -r $playbookPath $installPath
 
-
-Copy-Item  -r -Path $templatePath$srcFile -Destination $srcPath
+Copy-Item -Path $templatePath$srcFile\* -Destination $clientPath -Recurse -Force
 Copy-Item -Path $templatePath$gitignoreFile -Destination $gitignorePath
 Copy-Item -Path $templatePath$readmeFile -Destination $readmePath
 
@@ -179,11 +179,6 @@ $apiIP =CreateAZVM -name "api"
 # DB 
 Write-Output "Création de la VM DB"
 $dbIP = CreateAZVM -name "db"
-
-# Obtien la derniere address IP de next.txt puis incrémente 
-# les address et les mets à jours dans le VagrantFile
-# qui est mis dans le dossier client.
-$IPv4 = Get-Content $ipPath
 
 Add-Content -Path $hostPath -Value $bracketClient
 createIfNotExist -path $vagrantHosts
@@ -221,12 +216,12 @@ replaceInFile -fileInput $clientPlaybookPath$setupPB -toReplace "{{HTTPDADMIN}}"
 replaceInFile -fileInput $clientPlaybookPath$setupPB -toReplace "{{APIADMIN}}" -replacement $apiIP.admin
 replaceInFile -fileInput $clientPlaybookPath$setupPB -toReplace "{{DBADMIN}}" -replacement $dbIP.admin
 
+replaceInFile -fileInput $clientPlaybookPath$httdPB -toReplace "{{HTTPDADMIN}}" -replacement $httpdIP.admin
+replaceInFile -fileInput $clientPlaybookPath$apiPB -toReplace "{{APIADMIN}}" -replacement $apiIP.admin
+replaceInFile -fileInput $clientPlaybookPath$dbinstallPB -toReplace "{{DBADMIN}}" -replacement $dbIP.admin
 
 #sauvegarde le VagrantFile dans le dossier du client
 $fileContent | Set-Content -Path $vagrantPath
-
-# Mets à jours le contenue de next.txt 
-Set-Content -Path $ipPath -Value (ipUpdate -ip $IPv4 -increment ($vmNumber))
 
 # Mets a jours api-install.yml
 $fileContent = Get-Content -Path $templatePath$addtohostfile -Raw
@@ -251,7 +246,7 @@ Do {
 }
 Until ($addHost -eq 'y' -or $addHost -eq 'n')
 
-# Demande si veut ajouter au fichier hosts dy systeme d'operation
+# Demande si veut ajouter au fichier hosts du systeme d'operation
 if ($addHost -eq 'y') {
 
     if ($IsWindows) {
@@ -290,6 +285,8 @@ $response = gh repo create "$myOrg-$client" --public --source $clientPath --push
 $pushedCommits = $response -split "branch" | Select-Object -First 1
 write-host "$pushedCommits.git"
 }
-replaceInFile -fileInput $clientPlaybookPath$setupPB -toReplace "{{GITHUB}}" -replacement "$pushedCommits.git"
+
+replaceInFile -fileInput $clientPlaybookPath$httdPB -toReplace "{{GITHUB}}" -replacement "$pushedCommits.git"
+replaceInFile -fileInput $clientPlaybookPath$httdPB -toReplace "{{CLIENT}}" -replacement $client
 
 cd $commonPath

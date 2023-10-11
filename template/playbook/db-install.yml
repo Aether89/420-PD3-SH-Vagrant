@@ -9,6 +9,7 @@
 - hosts: {{IP3}}
   become: yes
   vars:
+    ansible_user: {{DBADMIN}}
     postgresql_version: '13'
     postgresql_db: 'newtech'
     postgresql_user: 'NewTechUser'
