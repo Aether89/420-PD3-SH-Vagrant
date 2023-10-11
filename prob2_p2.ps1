@@ -168,11 +168,13 @@ replaceInFile -fileInput $clientPlaybookPath$updatePB -toReplace "{{CLIENT}}" -r
 Write-Output "Veuillez vous connecter à Azure"
 connect-azaccount
 
-# HTTPD
-Write-Output "Création de la VM HTTPD"
-$httpdIP = createAZVM -name "httpd"
+# API
+write-Output "Création de la VM API"
+$apiIP =CreateAZVM -name "api"
 
-
+# DB 
+Write-Output "Création de la VM DB"
+$dbIP = CreateAZVM -name "db"
 
 Add-Content -Path $hostPath -Value $bracketClient
 createIfNotExist -path $vagrantHosts
@@ -183,25 +185,35 @@ for ($i = 0; $i -lt $vmNumber; $i++) {
 
     switch ($i) {
         0 {
-            Add-Content -Path $hostPath -Value $httpdIP.ip
-            Add-Content -Path $vagrantHostsFile -Value $httpdIP.ip
+            Add-Content -Path $hostPath -Value $apiIP.ip
+            Add-Content -Path $vagrantHostsFile -Value $apiIP.ip
         
-            replaceInFile -fileInput $clientPlaybookPath$setupPB -toReplace $stringToReplace -replacement $httpdIP.ip
-            replaceInFile -fileInput $clientPlaybookPath$httdPB -toReplace $stringToReplace -replacement $httpdIP.ip
+            replaceInFile -fileInput $clientPlaybookPath$setupPB -toReplace $stringToReplace -replacement $apiIP.ip
+            replaceInFile -fileInput $clientPlaybookPath$apiPB -toReplace $stringToReplace -replacement $apiIP.ip
         }
-       
+        1 {
+            Add-Content -Path $hostPath -Value $dbIP.ip
+            Add-Content -Path $vagrantHostsFile -Value $dbIP.ip
+        
+            replaceInFile -fileInput $clientPlaybookPath$setupPB -toReplace $stringToReplace -replacement $dbIP.ip
+            replaceInFile -fileInput $clientPlaybookPath$dbinstallPB -toReplace $stringToReplace -replacement $dbIP.ip
+        }
     }
 }
 
-replaceInFile -fileInput $clientPlaybookPath$setupPB -toReplace "{{HTTPDADMIN}}" -replacement $httpdIP.admin
+
+replaceInFile -fileInput $clientPlaybookPath$setupPB -toReplace "{{APIADMIN}}" -replacement $apiIP.admin
+replaceInFile -fileInput $clientPlaybookPath$setupPB -toReplace "{{DBADMIN}}" -replacement $dbIP.admin
 
 
-replaceInFile -fileInput $clientPlaybookPath$httdPB -toReplace "{{HTTPDADMIN}}" -replacement $httpdIP.admin
-
+replaceInFile -fileInput $clientPlaybookPath$apiPB -toReplace "{{APIADMIN}}" -replacement $apiIP.admin
+replaceInFile -fileInput $clientPlaybookPath$dbinstallPB -toReplace "{{DBADMIN}}" -replacement $dbIP.admin
 
 #sauvegarde le VagrantFile dans le dossier du client
 $fileContent | Set-Content -Path $vagrantPath
 
+# Mets a jours api-install.yml
+$fileContent = Get-Content -Path $templatePath$addtohostfile -Raw
 
 
 # Génere le contenue qui sera ajouter au hôte
@@ -212,26 +224,39 @@ $fileContent = Get-Content -Path $templatePath$addtohostfile -Raw
 $fileContent = $fileContent -replace "{{HOSTSINFO}}", "`"$hostContent`""
 # créer le fichier  C:/travail/commun/config/$client/addtohost.ps1
 $fileContent | Set-Content -Path $addtohostPath
+Write-Output "Un script permettant de faire l'ajout de $client.com et api.$client.com`nau fichier hosts de l'hôte a été ajouté dans $addtohostPath"  
+
+# Prompt pour demander à l'utilisatueur si veut ajouter 
+# client.com et api.client.com au fichier hosts du systeme
+$Cursor = [System.Console]::CursorTop
+Do {
+    [System.Console]::CursorTop = $Cursor
+    $addHost = Read-Host -Prompt "Voulez-vous faire les ajoûts dans le fichier hosts maintenant?(y/n)"
+}
+Until ($addHost -eq 'y' -or $addHost -eq 'n')
+
+# Demande si veut ajouter au fichier hosts du systeme d'operation
+if ($addHost -eq 'y') {
+
+    if ($IsWindows) {
+
+        $fileContent = Get-Content -Path $templatePath$winHostFile -Raw
+        $fileContent = $fileContent -replace "{{HOSTSINFO}}", "`"$hostContent`""
+        $fileContent | Set-Content -Path $commonPath$winHostFile
+
+        Read-Host -Prompt "Une nouvelle fenêtre s'ouvrira pour faire 
+        l'ajout dans le fichier host`nSi demander, Accepter pour faire l'ajout.
+        appuyer sur Entrée pour continuer"
+        # execute le fichier dans fenetre avec les permision administrateur.
+        # Doit écrire le chemin au complet car ne fonctionne pas avec des variables 
+        Start-Process powershell -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"C:/travail/commun/winhost.ps1`"" -Verb runAs
+    }
+    else {
+        Write-Output "Veuillez entrez votre mots de passe pour faire l'ajout dans le fichier hosts."        
+        $hostContent | sudo tee -a $syshostsPath
+    }
+}
 
 cd $clientPath
 
-git init
-git add .
-git commit -m "Initial commit"
 
-Do {
-    [System.Console]::CursorTop = $Cursor
-    $commitGitHub = Read-Host -Prompt "Voulez-vous pousser le répertoire sur GitHub?(y/n)"
-}
-Until ($commitGitHub -eq 'y' -or $commitGitHub -eq 'n')
-
-if ($commitGitHub -eq 'y') {
-$response = gh repo create "$myOrg-$client" --public --source $clientPath --push
-$pushedCommits = $response -split "branch" | Select-Object -First 1
-write-host "$pushedCommits.git"
-}
-
-replaceInFile -fileInput $clientPlaybookPath$httdPB -toReplace "{{GITHUB}}" -replacement "$pushedCommits.git"
-replaceInFile -fileInput $clientPlaybookPath$httdPB -toReplace "{{CLIENT}}" -replacement $client
-
-cd $commonPath
