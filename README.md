@@ -8,10 +8,25 @@
 - github cli
   - variable système pour GIT_ACCESS_TOKEN
 
-## Utilisation
+## Option 1 Préparation HTTPD, API & DB (Tous en un)
 
-1 - Lancer le script powershell (./prob2_p1.ps1)
+1 - Lancer le script powershell (./prob2.ps1)
 2 - Suive les instruction affiché dans la console
 3 - Démarrer la machine virtuelle Ansible (vagrant up)
 4 - Connecter à la machine virtuelle Ansible (vagrant ssh ansible)
 5 - Lancer le script de setup /home/vagrant/config/{{CLIENT}}/playbook/setup.sh 
+
+## Option 2 Préparation HTTPD (seuls) 
+## * non fonctionnell erreur avec les scripts pour copier les fichiers dans le dossier config ainsi que leur modification
+## Partie 1
+1 - Lancer le script powershell (./prob2_p1.ps1)
+2 - Suive les instruction affiché dans la console
+3 - Démarrer la machine virtuelle Ansible (vagrant up)
+4 - Connecter à la machine virtuelle Ansible (vagrant ssh ansible)
+5 - Lancer le script de setup /home/vagrant/config/{{CLIENT}}/playbook/setup_p1.sh 
+
+### Parti 2
+1 - Lancer le script powershell (./prob2_p2.ps1)
+2 - Suive les instruction affiché dans la console
+3 - Connecter à la machine virtuelle Ansible (vagrant ssh ansible)
+5 - Lancer le script de setup /home/vagrant/config/{{CLIENT}}/playbook/setup_p2.sh 

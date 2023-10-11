@@ -1,0 +1,104 @@
+---
+# NewTech First Problematic
+#
+# Install and configure PostgreSQL in order to provide a database
+# for the API Web Server. It creates a new user NewTechUser and a 
+# new database. It also authorize remote connection for that user.
+# Lookup `pg_hba.conf` for more information.
+
+- hosts: {{IP3}}
+  become: yes
+  vars:
+    ansible_user: {{DBADMIN}}
+    postgresql_version: '13'
+    postgresql_db: 'newtech'
+    postgresql_user: 'NewTechUser'
+    postgresql_password: 'NewTech'
+    postgresql_root_password: 'SomeDifficultPass123$'
+
+  tasks:
+    - name: Install prerequisites
+      apt:
+        pkg:
+        - python3-psycopg2
+        update_cache: yes
+    
+    - name: Add PostgreSQL APT Key
+      apt_key:
+        url: https://www.postgresql.org/media/keys/ACCC4CF8.asc
+        state: present
+
+    - name: Add PostgreSQL APT repository
+      apt_repository:
+        repo: "deb http://apt.postgresql.org/pub/repos/apt/ {{ ansible_lsb.codename }}-pgdg main {{ postgresql_version }}"
+        state: present
+    
+    - name: Install PostgreSQL
+      apt:
+        pkg:
+        - postgresql-{{ postgresql_version }}
+        - postgresql-contrib-{{ postgresql_version }}
+        update_cache: yes
+
+    - name: Check if the password has been set
+      stat:
+        path: "/home/vagrant/.pgpass"
+      register: password_marker
+
+    - name: Change the password for the postgres user
+      command: sudo -u postgres psql -c "ALTER USER postgres WITH PASSWORD '{{ postgresql_root_password }}';"
+      when: not password_marker.stat.exists
+
+    - name: Change the password for the postgres user
+      ansible.builtin.command: sudo -u postgres psql -c "ALTER USER postgres WITH PASSWORD '{{ postgresql_root_password }}';"
+
+    - name: Add .pgpass file
+      ansible.builtin.copy:
+        src: /home/vagrant/config/ansible/.pgpass
+        dest: /home/vagrant/.pgpass
+        owner: vagrant
+        group: vagrant
+        mode: '0600'
+
+    - name: Replace config file
+      ansible.builtin.copy:
+        src: /home/vagrant/config/ansible/pg_hba.conf
+        dest: /etc/postgresql/13/main/pg_hba.conf
+        owner: postgres
+        group: postgres
+        mode: '0600'
+    
+    - name: Reload PostgreSQL
+      service:
+        name: postgresql
+        state: reloaded
+
+    - name: Create a new database user
+      postgresql_user:
+        name: "{{ postgresql_user }}"
+        password: "{{ postgresql_password }}"
+        role_attr_flags: CREATEDB,NOSUPERUSER
+        login_user: postgres
+      become: yes
+      become_user: vagrant
+
+    - name: Create a new database
+      postgresql_db:
+        name: "{{ postgresql_db }}"
+        owner: "{{ postgresql_user }}"
+        login_user: postgres
+      become: yes
+      become_user: vagrant
+
+    - name: Allow remote connections to PostgreSQL
+      lineinfile:
+        dest: /etc/postgresql/{{ postgresql_version }}/main/postgresql.conf
+        regexp: '^#?listen_addresses'
+        line: "listen_addresses = '*'"
+      notify: Restart PostgreSQL
+
+  handlers:
+    - name: Restart PostgreSQL
+      service:
+        name: postgresql
+        state: restarted

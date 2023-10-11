@@ -15,6 +15,28 @@ function createIfNotExist {
     }
 }
 
+# Incrément l'IP
+function ipUpdate {
+    param (
+        [string]$ip,
+        [int]$increment
+    )
+
+    $ip = $ip.Trim()
+    $octets = $ip.Split(".")
+    $lastOctet = [int]$octets[3] + $increment
+
+    if ($lastOctet -gt 254) {
+        $lastOctet = 254
+    }
+    elseif ($lastOctet -lt 0) {
+        $lastOctet = 0
+    }
+    $octets[3] = [string]$lastOctet
+    $tmpIP = $octets -join "."
+    $tmpIP
+}
+
 function replaceInFile {
     param (
         [string]$fileInput,
@@ -57,7 +79,6 @@ $vmSize = "Standard_B1ls"
 $vmLocation = "canadacentral"
 $myOrg = "NewTech"
 $pushedCommits = "https://github.com/Aether89/NewTech-Default"
-
 #variable de nom de fichier utiliser dans le script
 $date = Get-Date -Format "yyyy-MM-dd HH:mm"
 
@@ -66,10 +87,12 @@ $VagrantFile = "VagrantFile"
 $srcFile = "src"
 $gitignoreFile = ".gitignore"
 $readmeFile = "README.md"
-$addtohostfile = "addtohostHTTPD.ps1"
+$addtohostfile = "addtohost.ps1"
 $winHostFile = "winhost.ps1"
+$apiPB = "api-install.yml"
+$dbInstallPB = "db-install.yml"
 $httdPB = "httpd-install.yml"
-$setupPB = "setup_p1.sh"
+$setupPB = "setup.sh"
 $updatePB = "update.yml"
 $workDir = "travail/"
 $commonDir = "commun/"
@@ -84,6 +107,9 @@ else {
     $installPathOS = "~/"
     $syshostsPath = "/etc/hosts"
 }
+
+#nombre de VM dans le VagrantFile
+$vmNumber = 3;
 
 $client = Read-Host -Prompt 'Insérer le nom du client'
 
@@ -103,14 +129,16 @@ $templatePath = $commonPath + $templateDir
 $vagrantHosts = $configPath + ".hosts/"
 
 #variable de chemin des fichiers
+$ipPath = $commonPath + "next.txt"
 $templateClientPath = $templatePath + "client"
-$playbookPath = $templatePath + "playbook_p1"
+$playbookPath = $templatePath + "playbook"
 $clientPlaybookPath = $installPath + "playbook/"
 $hostPath = $configPath + $hostFile
 $clientPath = $workPath + $client
 $vagrantPath = $clientPath + "/" + $VagrantFile
 $gitignorePath = $clientPath + "/" + $gitignoreFile
 $readmePath = $clientPath + "/" + $readmeFile
+### $clienthostPath = $installPath + $hostFile
 $addtohostPath = $installPath + $addtohostfile
 $vagrantHostsFile = $VagrantHosts + $client
 
@@ -119,12 +147,12 @@ createIfNotExist -Path $clientPath
 
 #utiliser pour le fichier HOST de Ansible
 $bracketClient = "[$client]"
-Copy-Item -Path "$templateClientPath\*" -Destination $installPath -Recurse
+Copy-Item -Path "$templateClientPath\*" -Destination $installPath -Recurse -Force
 
 #copie les playbook de templates dans le dossieer du client
 Copy-Item -r $playbookPath $installPath
 
-Copy-Item -Path $templatePath$srcFile\* -Destination $clientPath -Recurse
+Copy-Item -Path $templatePath$srcFile\* -Destination $clientPath -Recurse -Force
 Copy-Item -Path $templatePath$gitignoreFile -Destination $gitignorePath
 Copy-Item -Path $templatePath$readmeFile -Destination $readmePath
 
@@ -143,23 +171,53 @@ connect-azaccount
 Write-Output "Création de la VM HTTPD"
 $httpdIP = createAZVM -name "httpd"
 
+# API
+write-Output "Création de la VM API"
+$apiIP =CreateAZVM -name "api"
+
+# DB 
+Write-Output "Création de la VM DB"
+$dbIP = CreateAZVM -name "db"
+
 Add-Content -Path $hostPath -Value $bracketClient
 createIfNotExist -path $vagrantHosts
 Add-Content -Path $vagrantHostsFile -Value $bracketClient
 
-    $stringToReplace = "{{IP1}}"
+for ($i = 0; $i -lt $vmNumber; $i++) {
+    $stringToReplace = "{{IP" + ($i + 1) + "}}"
 
+    switch ($i) {
+        0 {
             Add-Content -Path $hostPath -Value $httpdIP.ip
             Add-Content -Path $vagrantHostsFile -Value $httpdIP.ip
         
             replaceInFile -fileInput $clientPlaybookPath$setupPB -toReplace $stringToReplace -replacement $httpdIP.ip
             replaceInFile -fileInput $clientPlaybookPath$httdPB -toReplace $stringToReplace -replacement $httpdIP.ip
+        }
+        1 {
+            Add-Content -Path $hostPath -Value $apiIP.ip
+            Add-Content -Path $vagrantHostsFile -Value $apiIP.ip
         
-       
+            replaceInFile -fileInput $clientPlaybookPath$setupPB -toReplace $stringToReplace -replacement $apiIP.ip
+            replaceInFile -fileInput $clientPlaybookPath$apiPB -toReplace $stringToReplace -replacement $apiIP.ip
+        }
+        2 {
+            Add-Content -Path $hostPath -Value $dbIP.ip
+            Add-Content -Path $vagrantHostsFile -Value $dbIP.ip
+        
+            replaceInFile -fileInput $clientPlaybookPath$setupPB -toReplace $stringToReplace -replacement $dbIP.ip
+            replaceInFile -fileInput $clientPlaybookPath$dbinstallPB -toReplace $stringToReplace -replacement $dbIP.ip
+        }
+    }
+}
 
 replaceInFile -fileInput $clientPlaybookPath$setupPB -toReplace "{{HTTPDADMIN}}" -replacement $httpdIP.admin
+replaceInFile -fileInput $clientPlaybookPath$setupPB -toReplace "{{APIADMIN}}" -replacement $apiIP.admin
+replaceInFile -fileInput $clientPlaybookPath$setupPB -toReplace "{{DBADMIN}}" -replacement $dbIP.admin
 
 replaceInFile -fileInput $clientPlaybookPath$httdPB -toReplace "{{HTTPDADMIN}}" -replacement $httpdIP.admin
+replaceInFile -fileInput $clientPlaybookPath$apiPB -toReplace "{{APIADMIN}}" -replacement $apiIP.admin
+replaceInFile -fileInput $clientPlaybookPath$dbinstallPB -toReplace "{{DBADMIN}}" -replacement $dbIP.admin
 
 #sauvegarde le VagrantFile dans le dossier du client
 $fileContent | Set-Content -Path $vagrantPath
@@ -176,7 +234,7 @@ $fileContent = Get-Content -Path $templatePath$addtohostfile -Raw
 $fileContent = $fileContent -replace "{{HOSTSINFO}}", "`"$hostContent`""
 # créer le fichier  C:/travail/commun/config/$client/addtohost.ps1
 $fileContent | Set-Content -Path $addtohostPath
-Write-Output "Un script permettant de faire l'ajout de $client.com `nau fichier hosts de l'hôte a été ajouté dans $addtohostPath"  
+Write-Output "Un script permettant de faire l'ajout de $client.com et api.$client.com`nau fichier hosts de l'hôte a été ajouté dans $addtohostPath"  
 
 # Prompt pour demander à l'utilisatueur si veut ajouter 
 # client.com et api.client.com au fichier hosts du systeme

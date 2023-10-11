@@ -1,0 +1,27 @@
+---
+# NewTech First Problematic
+#
+# Install HTTPd server for static Web server
+
+- name: Install and configure HTTPd server
+  hosts: {{IP1}}
+  become: yes
+  vars:
+      ansible_user: {{HTTPDADMIN}}
+
+  tasks:
+    - name: Install Apache2
+      apt:
+        name: apache2
+        state: present
+        
+    - name: Delete content & directory
+      ansible.builtin.file:
+        state: absent
+        path: /var/www/html/
+
+    - name: Checkout repo on remote node
+      become_user: 
+      git:
+        repo: '{{GITHUB}}'
+        dest: '/var/www/html'

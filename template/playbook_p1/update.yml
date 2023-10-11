@@ -1,0 +1,24 @@
+---
+- name: Update Debian-based Systems
+  hosts: {{CLIENT}}
+  become: yes
+
+  tasks:
+    - name: Update package cache
+      apt:
+        update_cache: yes
+      when: ansible_os_family == 'Debian'
+
+    - name: Upgrade all packages
+      apt:
+        upgrade: yes
+        autoremove: yes
+        autoclean: yes
+      when: ansible_os_family == 'Debian'
+      
+    - name: Install required packaged
+      apt:
+        name: "{{ item }}"
+        state: present
+      with_items:
+        - acl

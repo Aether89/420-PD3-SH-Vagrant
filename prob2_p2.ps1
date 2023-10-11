@@ -56,20 +56,14 @@ $vmOS = "Ubuntu2204"
 $vmSize = "Standard_B1ls"
 $vmLocation = "canadacentral"
 $myOrg = "NewTech"
-$pushedCommits = "https://github.com/Aether89/NewTech-Default"
-
 #variable de nom de fichier utiliser dans le script
-$date = Get-Date -Format "yyyy-MM-dd HH:mm"
 
 $hostFile = "/HOSTS"
-$VagrantFile = "VagrantFile"
-$srcFile = "src"
-$gitignoreFile = ".gitignore"
-$readmeFile = "README.md"
-$addtohostfile = "addtohostHTTPD.ps1"
+$addtohostfile = "addtohostAPI.ps1"
 $winHostFile = "winhost.ps1"
-$httdPB = "httpd-install.yml"
-$setupPB = "setup_p1.sh"
+$apiPB = "api-install.yml"
+$dbInstallPB = "db-install.yml"
+$setupPB = "setup_p2.sh"
 $updatePB = "update.yml"
 $workDir = "travail/"
 $commonDir = "commun/"
@@ -104,32 +98,20 @@ $vagrantHosts = $configPath + ".hosts/"
 
 #variable de chemin des fichiers
 $templateClientPath = $templatePath + "client"
-$playbookPath = $templatePath + "playbook_p1"
+$playbookPath = $templatePath + "playbook_p2"
 $clientPlaybookPath = $installPath + "playbook/"
 $hostPath = $configPath + $hostFile
 $clientPath = $workPath + $client
-$vagrantPath = $clientPath + "/" + $VagrantFile
-$gitignorePath = $clientPath + "/" + $gitignoreFile
-$readmePath = $clientPath + "/" + $readmeFile
 $addtohostPath = $installPath + $addtohostfile
 $vagrantHostsFile = $VagrantHosts + $client
 
 Write-Output $clientPath
 createIfNotExist -Path $clientPath
 
-#utiliser pour le fichier HOST de Ansible
-$bracketClient = "[$client]"
 Copy-Item -Path "$templateClientPath\*" -Destination $installPath -Recurse
 
 #copie les playbook de templates dans le dossieer du client
 Copy-Item -r $playbookPath $installPath
-
-Copy-Item -Path $templatePath$srcFile\* -Destination $clientPath -Recurse
-Copy-Item -Path $templatePath$gitignoreFile -Destination $gitignorePath
-Copy-Item -Path $templatePath$readmeFile -Destination $readmePath
-
-replaceInFile -fileInput $readmePath -toReplace "{{DATE}}" -replacement $date 
-replaceInFile -fileInput $readmePath -toReplace "{{CLIENT}}" -replacement $client 
 
 # remplace {{CLIENT} dans les fichiers playbook avec le nom du client
 replaceInFile -fileInput $clientPlaybookPath$setupPB -toReplace "{{CLIENT}}" -replacement $client 
@@ -139,44 +121,47 @@ replaceInFile -fileInput $clientPlaybookPath$updatePB -toReplace "{{CLIENT}}" -r
 Write-Output "Veuillez vous connecter à Azure"
 connect-azaccount
 
-# HTTPD
-Write-Output "Création de la VM HTTPD"
-$httpdIP = createAZVM -name "httpd"
+# API
+write-Output "Création de la VM API"
+$apiIP =CreateAZVM -name "api"
 
-Add-Content -Path $hostPath -Value $bracketClient
+# DB 
+Write-Output "Création de la VM DB"
+$dbIP = CreateAZVM -name "db"
+
 createIfNotExist -path $vagrantHosts
-Add-Content -Path $vagrantHostsFile -Value $bracketClient
 
-    $stringToReplace = "{{IP1}}"
-
-            Add-Content -Path $hostPath -Value $httpdIP.ip
-            Add-Content -Path $vagrantHostsFile -Value $httpdIP.ip
+            Add-Content -Path $hostPath -Value $apiIP.ip
+            Add-Content -Path $vagrantHostsFile -Value $apiIP.ip
         
-            replaceInFile -fileInput $clientPlaybookPath$setupPB -toReplace $stringToReplace -replacement $httpdIP.ip
-            replaceInFile -fileInput $clientPlaybookPath$httdPB -toReplace $stringToReplace -replacement $httpdIP.ip
+            replaceInFile -fileInput $clientPlaybookPath$setupPB -toReplace "{{IP2}}" -replacement $apiIP.ip
+            replaceInFile -fileInput $clientPlaybookPath$apiPB -toReplace  "{{IP2}}" -replacement $apiIP.ip
+
+            Add-Content -Path $hostPath -Value $dbIP.ip
+            Add-Content -Path $vagrantHostsFile -Value $dbIP.ip
         
-       
+            replaceInFile -fileInput $clientPlaybookPath$setupPB -toReplace "{{IP3}}" -replacement $dbIP.ip
+            replaceInFile -fileInput $clientPlaybookPath$dbinstallPB -toReplace "{{IP3}}" -replacement $dbIP.ip
 
-replaceInFile -fileInput $clientPlaybookPath$setupPB -toReplace "{{HTTPDADMIN}}" -replacement $httpdIP.admin
 
-replaceInFile -fileInput $clientPlaybookPath$httdPB -toReplace "{{HTTPDADMIN}}" -replacement $httpdIP.admin
+replaceInFile -fileInput $clientPlaybookPath$setupPB -toReplace "{{APIADMIN}}" -replacement $apiIP.admin
+replaceInFile -fileInput $clientPlaybookPath$setupPB -toReplace "{{DBADMIN}}" -replacement $dbIP.admin
 
-#sauvegarde le VagrantFile dans le dossier du client
-$fileContent | Set-Content -Path $vagrantPath
+replaceInFile -fileInput $clientPlaybookPath$apiPB -toReplace "{{APIADMIN}}" -replacement $apiIP.admin
+replaceInFile -fileInput $clientPlaybookPath$dbinstallPB -toReplace "{{DBADMIN}}" -replacement $dbIP.admin
 
 # Mets a jours api-install.yml
 $fileContent = Get-Content -Path $templatePath$addtohostfile -Raw
 
-
 # Génere le contenue qui sera ajouter au hôte
-$hostContent = "`n$httpdIP `t$client.com`n$apiIP `tapi.$client.com"
+$hostContent = "`n$apiIP `tapi.$client.com"
 # Copie le fichier template addtohost en mémoire, 
 $fileContent = Get-Content -Path $templatePath$addtohostfile -Raw
 # remplace {{HOSTINFO}} avec le contenue de $hostconteent
 $fileContent = $fileContent -replace "{{HOSTSINFO}}", "`"$hostContent`""
 # créer le fichier  C:/travail/commun/config/$client/addtohost.ps1
 $fileContent | Set-Content -Path $addtohostPath
-Write-Output "Un script permettant de faire l'ajout de $client.com `nau fichier hosts de l'hôte a été ajouté dans $addtohostPath"  
+Write-Output "Un script permettant de faire l'ajout de api.$client.com`nau fichier hosts de l'hôte a été ajouté dans $addtohostPath"  
 
 # Prompt pour demander à l'utilisatueur si veut ajouter 
 # client.com et api.client.com au fichier hosts du systeme
@@ -208,26 +193,3 @@ if ($addHost -eq 'y') {
         $hostContent | sudo tee -a $syshostsPath
     }
 }
-
-Set-Location $clientPath
-
-git init
-git add .
-git commit -m "Initial commit"
-
-Do {
-    [System.Console]::CursorTop = $Cursor
-    $commitGitHub = Read-Host -Prompt "Voulez-vous pousser le répertoire sur GitHub?(y/n)"
-}
-Until ($commitGitHub -eq 'y' -or $commitGitHub -eq 'n')
-
-if ($commitGitHub -eq 'y') {
-$response = gh repo create "$myOrg-$client" --public --source $clientPath --push
-$pushedCommits = $response -split "branch" | Select-Object -First 1
-write-host "$pushedCommits.git"
-}
-
-replaceInFile -fileInput $clientPlaybookPath$httdPB -toReplace "{{GITHUB}}" -replacement "$pushedCommits.git"
-replaceInFile -fileInput $clientPlaybookPath$httdPB -toReplace "{{CLIENT}}" -replacement $client
-
-Set-Location $commonPath

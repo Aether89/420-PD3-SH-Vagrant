@@ -1,0 +1,45 @@
+---
+# NewTech First Problematic
+#
+# Install all the necessary packages to make a Web server used in an
+# API context.
+
+- name: Install and configure HTTPd server
+  hosts: {{IP2}}
+  become: yes
+  vars:
+      ansible_user: {{APIADMIN}}
+
+  tasks:
+    - name: Install Apache2
+      apt:
+        name: apache2
+        state: present
+
+    - name: Install PostgreSQL Client
+      apt:
+        name: postgresql-client
+        state: present
+
+    - name: Install PHP8.2
+      apt:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - php8.2
+        - php8.2-cli
+        - php8.2-mysql
+
+    - name: Copy the file to /var/www/html
+      ansible.builtin.copy:
+        src: /home/vagrant/config/index.php
+        dest: /var/www/html/index.php
+      register: copy_result
+
+    - name: Change the owner and group of the file
+      ansible.builtin.file:
+        path: /var/www/html/index.php
+        owner: www-data
+        group: www-data
+        state: file
+      when: copy_result.changed
