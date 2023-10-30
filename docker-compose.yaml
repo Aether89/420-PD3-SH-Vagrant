@@ -1,0 +1,16 @@
+version: '3'
+services:
+  db:
+    image: postgres
+    restart: always
+    environment:
+      POSTGRES_PASSWORD: ChuckIsGreat!
+      POSTGRES_USER: andrew
+      POSTGRES_DB: NewTech
+  
+  app:
+    image: demolive
+    volumes:
+      - .:/usr/src/app
+    ports: 
+      - 13370:1337
